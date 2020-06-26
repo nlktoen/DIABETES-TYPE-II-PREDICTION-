@@ -1,0 +1,830 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# # PROJECT OWNER
+
+# TUYEN NGUYEN
+# 
+# @: tuyen.bs19bds001@spjain.org
+# 
+# Phone: (+61)48-016-2923
+
+# # GENERAL INTRODUCTION
+
+# The Pima are a group of Native Americans living in central and Southern Arizona. A genetic predisposition allowed this group to survive normally to a diet with lowlevel of carbohydrates during history. However, nowadays, because of the decline in physical activity associated with a sudden shift from traditional agricultural crops to processed food made them obtain the highest prevalence of type 2 diabetes and for this reason they have been the subject of many researchs.
+
+# This project is another simple approach, which helps reduce the complexity leading to expensive costs in Medicine in quick type II diabetes prediction using 8 characteristics: 
+# 
+# (1) Number of times pregnant, 
+# 
+# (2) Plasma glucose concentration a 2 hours in an oral glucose tolerance test, 
+# 
+# (3) Diastolic blood pressure (mm Hg), 
+# 
+# (4) Triceps skin fold thickness (mm), 
+# 
+# (5) 2-Hour serum insulin (mu U/ml), 
+# 
+# (6) Body mass index (weight in kg/(height in m)^2), 
+# 
+# (7) Diabetes pedigree function, 
+# 
+# (8) Age (years)
+
+# The target column 'Outcome' indicates whether a person diagnosed with type II diabetes or not, '1' : Positive, '0' : Negative
+
+# # SOURCES
+
+# This dataset is originally from the National Institute of Diabetes and Digestive and Kidney Diseases.
+# You can downloaded from this address:https://www.kaggle.com/uciml/pima-indians-diabetes-database
+
+# # PROBLEM APPROACH
+
+# **The type of dataset and problem is a classic supervised binary classification**
+
+# With 768 elements all with certain attributes, I want to build a machine learning model to identify people affected by type 2 diabetes.
+# To solve the problem I will have to: firstly, inspect the data then cleaning it, do any required transformation and normalisation, apply a machine learning algorithms and using cross validation; after finding the best model, I train it, reset parameter, especially in this project, since the Logistic Regression is the best model, I modify it threshold and choosing which penalty (Ridge/Lasso) is most efficient advoid overfitting. Then check the performance of the final model with a 'made-up' information.
+
+# # OUTLINE
+
+# ***I) DATA INSPECTION:***
+# 
+# 1) IMPORT LIBRARIES AND DATASET
+# 
+# 2) GENERAL DESCRIPTION
+# 
+# 3) VISUALIZATION OF DATASET
+# 
+# ***II) DATA CLEANING AND TRANSFORMATION***
+# 
+# 1) DEALING WITH NULL VALUE
+# 
+# 2) DEALING WITH OUTLIERS
+# 
+# 3) FEATURE SCALING
+# 
+# ***III) TESTING MULTIPLE MODELS***
+# 
+# 1) SPLITTING THE DATASET
+# 
+# 2) BUILDING AND TESTING MODEL
+# 
+# ***IV) BUILDING THE BEST MODEL FOR PREDICTION***
+# 
+# 1) ANALYSIS OF 2 MODELS: CONFUSION MATRIX AND CLASSIFICATION REPORT
+# 
+# 2) FINDING THE BEST MODEL:
+# 
+# A- LINEAR DISCRIMINANT ANALYSIS
+# 
+# B- LOGISTIC REGRESSION: a) Avoid Overfitting with penalty, b) Best parameter
+# 
+# 3) APPLY NEW PARAMETER AND TRAIN IT
+# 
+# 4) MODIFY THE THRESHOLD
+# 
+# ***V) MAKE PREDICTION***
+# 
+# ***VI) CONCLUSION***
+
+# # DIABETES TYPE II PREDICTION PROJECT
+
+# # I) DATA INSPECTION
+
+# 1) IMPORT LIBRARIES USED AND THE PIMA INDIAN DIABETES TYPE 2 DATASET
+
+# In[1]:
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import sklearn.linear_model
+
+
+# In[2]:
+
+
+dia_df = pd.read_csv('C:/Kat/Tuyen/School/Sem2/Intro to Data Science/project/dataset/diabetes.csv')
+
+
+# In[4]:
+
+
+#Showing the dataframe
+dia_df
+
+
+# 2) SHAPE OF DATA AND GENERAL DESCRIPTIONS
+
+# In[5]:
+
+
+dia_df.shape
+
+
+# In[6]:
+
+
+#(768,9) means dataset includes 768 datapoints with 9 features (attributes)
+#The last attribute ('outcome') is the target column (supervised label)
+
+
+# In[7]:
+
+
+#Data general statistical numbers
+dia_stats=dia_df.describe().round(decimals=2)
+dia_stats
+
+
+# As we can see from the table, the number of attribute vectors, their mean, standard deviation, minimum/maximum, 1st-2nd-3rd quartiles
+
+# In[8]:
+
+
+#Data Correlation matrix
+cor_matrix=dia_df.corr().round(decimals=1)
+cor_matrix
+
+
+# This matrix is a significant tool to get insights of the correlation between different fields. Values range from -1 to 1, the more the absolute value of them closer to one, the stronger the relationship becomes. Their sign illustrate types of relationship ('-' : negative relationship, '+' : positive relationship)
+
+# For instance, I take the correlation between outcome and other attributes, it is evident to see that glucose has the largest correlation (0.5) and positive relationship with quality. That means the higher the Plasma glucose concentration a 2 hours in an oral glucose tolerance test is, the more likely a person is diagnosed with type II diabetes
+
+# In[9]:
+
+
+#We can visualize this correlation matrix
+import seaborn as sns
+sns.heatmap(cor_matrix, annot = True)
+
+
+# In[10]:
+
+
+#Another visualization of how each of attribute affect others
+from pandas.plotting import scatter_matrix
+scatter_matrix(dia_df)
+plt.show()
+
+
+# 3) VISUALIZATION OF DATASET
+
+# In[11]:
+
+
+#Histogram of each attribute
+import matplotlib.pyplot as plt
+dia_df.hist(bins=50, figsize=(20, 15))
+plt.show()
+
+
+# According to those histograms, we can see attributes: BMI, Blood Pressure, Diabetes Pedigree Function and skin thickness have a quite normal distribution
+
+# However, more importantly, the regconition of some attribute has null ('0') values, which is impossible in term of its indexes and might affect the analysis in future, such as: skin thickness, insulin, glucose, blood pressure... So I have to processed those data for better understanding
+
+# # II) DATA CLEANING AND TRANSFORMATION
+
+# 1) DEALING WITH NULL VALUES
+
+# The technique I use here is replacing them with their median value
+
+# Our dealing target is BMI, Blood Pressure, Glucose, Insulin, Skin thickness
+
+# In[12]:
+
+
+# Calculate the median value for BMI
+median_bmi = dia_df['BMI'].median()
+# Substitute it in the BMI column of the dataset where values are 0
+dia_df['BMI'] = dia_df['BMI'].replace(
+    to_replace=0, value=median_bmi)
+
+
+# In[1]:
+
+
+#Using the same logic, I deal with Blood Pressure, Glucose, Insulin, Skin thickness
+for i in ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin']:
+    median=dia_df[i].median()
+    dia_df[i]=dia_df[i].replace(to_replace =0, value=median)
+
+
+# We check these histograms again
+
+# In[14]:
+
+
+for i in ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI']:
+    dia_df[i].hist(bins=50, figsize=(20, 15))
+    plt.show()
+
+
+# Here all the '0' have been replaced
+
+# 2) DEALING WITH OUTLIERS
+
+# The technique I use here is removing them all from the dataset as they might have negative impact on my classification model
+
+# The below codes follow this logic:
+
+# a) For each column, first it computes the Z-score of each value in the column, relative to the column mean and standard deviation. 
+
+# b) It takes the absolute of Z-score because the direction does not matter, only if it is below the threshold. (here my target is extreme outliers - which are further more than 3 sd from mean value)
+
+# c) All(axis=1) ensures that for each row, all column satisfy the constraint. 
+
+# d) Change the dataframe based on the result
+
+# In[15]:
+
+
+from scipy import stats
+dia_df=dia_df[(np.abs(stats.zscore(dia_df)) < 3).all(axis=1)]
+
+
+# In[16]:
+
+
+dia_df
+
+
+# As the result, there are only 719 attribute vectors left, there are 49 datapoints that do not meet standards, are classified as extreme outliers and removed from the  dataset (6.4% reduction)
+
+# In order to avoid miss-indexing, I have to reset index of new dataset
+
+# In[17]:
+
+
+#Create an index array
+index=pd.Index([i for i in range(719)])
+#Reset the index of dataframe
+dia_df.index=index
+
+
+# In[18]:
+
+
+#Check the dataset reset 
+dia_df
+
+
+# 3) FEATURE SCALING
+
+# Look back to the statistical description of dataframe
+
+# In[19]:
+
+
+dia_stats=dia_df.describe().round(decimals=2)
+dia_stats
+
+
+# It's obvious that whereas some features have remarkably higher range as: insulin, glucose,... compared to pregnancies are just ranging from 0 to 13. This difference might affect classification depends on distance such as KNeighbor. Moreover, some learning algorithms don't work very well if the features have a different set of values. For this reason I need to apply a proper scaling system.
+
+# The scaling system I choose here is Standardization
+
+# In[20]:
+
+
+#Normalize data using sklearn StandardScaler
+from sklearn.preprocessing import StandardScaler as Scaler
+
+scaler = Scaler()
+scaler.fit(dia_df.iloc[:,:8])
+dia_scaled = scaler.transform(dia_df.iloc[:,:8])
+
+
+# In[21]:
+
+
+#Scaled values become a 2D array
+dia_scaled
+
+
+# In[22]:
+
+
+#Return this 2D array back to dataframe, however the 'outcome' column is removed
+dia_scaled_df = pd.DataFrame(dia_scaled)
+
+
+# In[23]:
+
+
+#Add the target column(outcome)
+dia_scaled_df['Outcome']=dia_df['Outcome']
+
+
+# In[24]:
+
+
+#Return the original names of these columns
+dia_scaled_df.columns=dia_df.columns
+
+
+# In[25]:
+
+
+#DataFrame showing
+dia_scaled_df
+
+
+# In[26]:
+
+
+#The following code checks whether any instances in 'Outcome' attribute is NaN caused by miss-indexing
+dia_scaled_df.Outcome.isnull().any()
+
+
+# As we can see now all the attributes (except the target column) are successfully standardized (ranging from -1 to 1)
+
+# # III) TESTING MULTIPLE MODELS
+
+# 1) SPLITTING THE DATASET INTO TRAIN AND TEST SET
+
+# In this case, I want to split the it into to train and test set with ratio 0.75 : 0.25, respectively
+
+# In[27]:
+
+
+X_train,X_test,Y_train,Y_test=sklearn.model_selection.train_test_split(dia_scaled,dia_df.Outcome,test_size=0.25,random_state=5)
+
+
+# 2) BUILDING AND TESTING MODELS
+
+# Right now, I didnot know which model is the best for our classification, I train and test each of them
+
+# To avoid overfitting, I split the dataset into many different folds for training and testing
+
+# In[28]:
+
+
+#Import all the learning algorithms we want to test
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors  import KNeighborsClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+
+
+# In[29]:
+
+
+#Import some utilities of sklearn to compare algorithms
+from sklearn import  model_selection
+from sklearn.metrics import classification_report #Reporting metric
+from sklearn.metrics import confusion_matrix #Confusion_matrix Reporting
+from sklearn.metrics import accuracy_score #Accuracy calculating
+
+
+# In[30]:
+
+
+# Prepare the configuration to run the test
+results=[]
+names=[]
+seed=7
+
+
+# In[31]:
+
+
+# Prepare an array with all the algorithms
+models = []
+models.append(('LR',LogisticRegression(solver='liblinear',multi_class='ovr')))
+models.append(('CARD',DecisionTreeClassifier()))
+models.append(('KNN',KNeighborsClassifier()))
+models.append(('LDA',LinearDiscriminantAnalysis()))
+models.append(('NB',GaussianNB()))
+models.append(('SVM',SVC()))
+
+
+# In[32]:
+
+
+#Evaluate each model in turn
+for name,model in models:
+    kfold=model_selection.KFold(n_splits=10,random_state=seed)
+    cv_results=model_selection.cross_val_score(model,X_train,Y_train,cv=kfold,scoring='accuracy')
+    results.append(cv_results)
+    names.append(name)
+    msg="%s:%f(%f)"%(name,cv_results.mean(),cv_results.std())
+    print(msg)
+
+
+# In[33]:
+
+
+# boxplot algorithm comparison
+fig = plt.figure()
+fig.suptitle('Algorithm Comparison')
+ax = fig.add_subplot(111)
+plt.boxplot(results)
+ax.set_xticklabels(names)
+plt.show()
+
+
+# It looks like that using this comparison method, the most performant algorithm is Logistic Regression and Linear Discriminant Analysis, those 2 are likely to have equal efficiency (81% vs 80%)
+
+# ROC CURVE FOR COMPARISON
+
+# In[34]:
+
+
+#Define x and y axis
+x = dia_df.drop(axis = 'columns', columns = 'Outcome')
+y_true = np.array(dia_df['Outcome'])
+
+
+# In[45]:
+
+
+from sklearn.metrics import roc_curve
+from sklearn.model_selection import cross_val_predict
+
+# Logistic Regression
+from sklearn.linear_model import LogisticRegression
+lr = LogisticRegression()
+lr.fit(x,y_true)
+y_score_lr = cross_val_predict(lr, x, y_true, method='decision_function',cv=10)
+
+fpr, tpr, threshold = roc_curve(y_true,y_score_lr)
+
+# GaussianNB
+from sklearn.naive_bayes import GaussianNB
+from sklearn.model_selection import cross_val_score
+
+gnbc = GaussianNB()
+gnbc.fit(x,y_true)
+gnbc_results = cross_val_score(gnbc,x,y_true,scoring='accuracy')
+y_score_gnb = cross_val_predict(gnbc,x,y_true,method='predict_proba',cv=10)
+fpr_gnb, tpr_gnb, threshold_gnb = roc_curve(y_true,y_score_gnb[:,1])
+
+# K Neighbor Classifier
+from sklearn.neighbors import KNeighborsClassifier
+
+knc = KNeighborsClassifier()
+knc.fit(x,y_true)
+knc_results = cross_val_score(knc,x,y_true,scoring='accuracy')
+y_score_knn = cross_val_predict(knc,x,y_true,method='predict_proba',cv=10)
+fpr_knn, tpr_knn, threshold_knn = roc_curve(y_true,y_score_knn[:,1])
+
+# LDA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+lda = LinearDiscriminantAnalysis()
+lda.fit(x,y_true)
+lda_results = cross_val_score(lda,x,y_true,scoring='accuracy')
+y_score_lda = cross_val_predict(lda,x,y_true,method='predict_proba',cv=10)
+fpr_lda, tpr_lda, threshold_lda = roc_curve(y_true,y_score_lda[:,1])
+
+# SVC
+from sklearn.svm import SVC
+svc = SVC(probability = True)
+svc.fit(x,y_true)
+svc_results = cross_val_score(svc,x,y_true,scoring='accuracy')
+y_score_svc = cross_val_predict(svc,x,y_true,method='predict_proba',cv=10)
+fpr_svc, tpr_svc, threshold_svc = roc_curve(y_true,y_score_svc[:,1])
+
+# ROC Curve for the models above
+plt.plot(fpr,tpr,label='Logistic Regression')
+plt.plot(fpr_gnb, tpr_gnb,label='Gaussian NB')
+plt.plot(fpr_knn, tpr_knn,label='KNN')
+plt.plot(fpr_lda, tpr_lda,label='LDA')
+plt.plot(fpr_svc, tpr_svc,label='SVC')
+plt.legend()
+plt.plot([0, 1], [0, 1], 'k--')
+plt.axis([0, 1, 0, 1])
+plt.xlabel('False Positive Rate', fontsize=16)
+plt.ylabel('True Positive Rate', fontsize=16)
+plt.figure(figsize=(10, 6))
+plt.show()
+plt.show
+
+
+# In[49]:
+
+
+from sklearn.metrics import roc_auc_score
+print ('AUC of Logistic Regression:',roc_auc_score(y_true,y_score_lr))
+print ('AUC of GaussianNB:',roc_auc_score(y_true,y_score_gnb[:,1]))
+print ('AUC of KNeighborsClassifier:',roc_auc_score(y_true,y_score_knn[:,1]))
+print ('AUC of Linear Discriminant Analysis:',roc_auc_score(y_true,y_score_lda[:,1]))
+print ('AUC of Support Vector Machine:',roc_auc_score(y_true,y_score_svc[:,1]))
+
+
+# It looks like that using this comparison method, the most performant algorithm is Logistic Regression and Linear Discriminant Analysis, those 2 are likely to have equal efficiency (82.8% vs 83.9%)
+
+# # IV) BUILDING THE BEST MODEL FOR PREDICTION
+
+# 1) ANALYSIS OF 2 MODELS: LOGISTIC REGRESSION AND LINEAR DISCRIMINANT ANALYSIS
+
+# The following confusion matrices and classification reports will give you a brief overview of th 2 most effective models 
+
+# **** CONFUSION MATRIX ****
+
+# In[95]:
+
+
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+#Logistic Regression
+lr=LogisticRegression()
+lr.fit(X_train,Y_train)
+predictions1=lr.predict(X_test)
+cm1=confusion_matrix(Y_test,predictions1)
+fig, ax= plt.subplots(figsize=(6,3))
+sns.heatmap(cm1, annot=True, ax = ax,linewidths=.5); #annot=True to annotate cells
+
+# labels, title and ticks
+ax.set_xlabel('Predicted labels');ax.set_ylabel('True labels'); 
+ax.set_title('Confusion Matrix'); 
+ax.xaxis.set_ticklabels(['Positive', 'Negative']); ax.yaxis.set_ticklabels(['Negative', 'Positive']);
+
+
+# In[71]:
+
+
+tn, fp, fn, tp = confusion_matrix(Y_test,predictions1).ravel()
+print('True Positive:', tp,';',
+      'False Positive:', fp,';',
+      'True Negative:', tn,';',
+      'False Negative', fn)
+
+
+# In[102]:
+
+
+#Linear Discriminant Analysis
+lda=LinearDiscriminantAnalysis()
+lda.fit(X_train,Y_train)
+predictions2=lda.predict(X_test)
+cm2=confusion_matrix(Y_test,predictions2)
+fig, ax= plt.subplots(figsize=(6,3))
+sns.heatmap(cm2, annot=True, ax = ax,linewidths=.5); #annot=True to annotate cells
+
+# labels, title and ticks
+ax.set_xlabel('Predicted labels');ax.set_ylabel('True labels'); 
+ax.set_title('Confusion Matrix'); 
+ax.xaxis.set_ticklabels(['Positive', 'Negative']); ax.yaxis.set_ticklabels(['Negative', 'Positive']);
+
+
+# In[74]:
+
+
+tn, fp, fn, tp = confusion_matrix(Y_test,predictions2).ravel()
+print('True Positive:', tp,';',
+      'False Positive:', fp,';',
+      'True Negative:', tn,';',
+      'False Negative', fn)
+
+
+# **** CLASSIFICATION REPORT ****
+
+# In[105]:
+
+
+from sklearn.metrics import confusion_matrix
+#Logistic Regression
+print(classification_report(Y_test,predictions1))
+
+
+# In[104]:
+
+
+#Linear Discriminant Analysis
+print(classification_report(Y_test,predictions2))
+
+
+# 2) FINDING THE BEST MODEL BY GRIDSEARCH
+
+# # A- Linear Discriminant Analysis
+
+# In[185]:
+
+
+from sklearn.model_selection import GridSearchCV
+
+param_grid1 = {
+    'solver': ['svd', 'lsqr', 'eigen']
+}
+
+model_lda= LinearDiscriminantAnalysis()
+
+grid_search1 = GridSearchCV(
+    model_lda, param_grid1, cv=10, scoring='accuracy')
+grid_search1.fit(X_train, Y_train)
+
+
+# The parameter above is the best parameter for LinearDiscriminantAnalysis model, I will use it the build the model
+
+# In[186]:
+
+
+# Print the bext score found
+grid_search1.best_score_
+
+
+# # B-Logistic Regression
+
+# a) Penalty testing - advoid overfitting
+
+# In[187]:
+
+
+#RIDGE REGRESSION (L2 PENALTY)
+from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import Ridge
+ridge=Ridge()
+parameters= {'alpha':[2,4,6,8,10]}
+ridge_reg=GridSearchCV(ridge, parameters,scoring='neg_mean_squared_error',cv=10)
+ridge_reg.fit(X_train,Y_train)
+print("The best parameter is:",ridge_reg.best_params_)
+print("The best score for this penalty is",ridge_reg.best_score_)
+
+
+# In[188]:
+
+
+#LASSO REGRESSION (L1 PENALTY)
+from sklearn.linear_model import Lasso
+
+parameters= {'alpha':[2,4,6,8,10]}
+
+lasso=Lasso()
+lasso_reg=GridSearchCV(lasso, param_grid=parameters, scoring='neg_mean_squared_error', cv=10)
+lasso_reg.fit(X_train,Y_train)
+print("The best parameter is:",lasso_reg.best_params_)
+print('The best score for this penalty is: ',lasso_reg.best_score_)
+
+
+# The above testing points out that the L2 penalty with alpha=10 would be more effective for our model (-0.22<-0.15)
+
+# b) Best parameter for Logistic Regression
+
+# In[193]:
+
+
+param_grid2 = {
+    'penalty':['l2'],
+    'C':[1.0,10.0,50.0],
+    'solver':['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga']
+}
+
+model_lr= LogisticRegression()
+
+grid_search2 = GridSearchCV(
+    model_lr, param_grid2, cv=10, scoring='accuracy')
+grid_search2.fit(X_train, Y_train)
+print("The best score for this model is",grid_search2.best_score_)
+
+
+# Since 2 models: Linear Discriminant Analysis and Logistic Regression with optimized parameter have the same best accuracy score, we can build either one of them for our prediction
+
+# 3) APPLY THE BEST PARAMETERS TO THE MODEL AND TRAIN IT
+
+# I choose Logistic Regression with L2 penalty and compatable parameter computed above
+
+# In[198]:
+
+
+# Create an instance of the algorithm using parameters
+# from best_estimator_ property
+lr = grid_search2.best_estimator_
+
+
+# In[199]:
+
+
+# Use the whole dataset to train the model
+X = np.append(X_train, X_test, axis=0)
+Y = np.append(Y_train, Y_test, axis=0)
+
+
+# In[200]:
+
+
+# Train the model
+lr.fit(X, Y)
+
+
+# 4) MODIFY THE THRESHOLD
+
+# In[161]:
+
+
+#Define a function to optimize the threshold
+def optimize_threshold(model):
+    bestthresh = []
+    for i in range(1,101):
+        threshold = i/100
+        pred = np.where(model.predict_proba(X_test)[:,1] > threshold, 1, 0)
+        tn, fp, fn, tp = confusion_matrix(Y_test, pred).ravel()
+        recall = tp / (tp + fn)
+        precision = tp / (tp + fp)
+        f1 = (2*recall*precision)/(recall+precision)
+        if recall>=0.9 and f1>=0.7:
+            bestthresh.append(threshold)
+    return bestthresh
+
+
+# This function will return a list of best thresholds for our model. I want to obtain only threshold with recall>=0.9 and f1>=0.7, which can not only maximize the recall, minimize the False Negative problem, but also balance the interrelation between recall and precision
+
+# In[162]:
+
+
+print('Logistic Regression')
+optimize_threshold(lr)
+
+
+# In[165]:
+
+
+print('Linear Discriminant Analysis')
+optimize_threshold(lda)
+
+
+# Now I just focus on ist of best threholds for Logistic Regression:[0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.3]
+# From the list, we can see optimized thresholds are ranging from 0.22 to 0.3, I pick the median/mean one, which is 0.26 for our model. Then if the probability belongs to '1' class is larger than 0.26, then a person is predicted to be positive with Type II diabete.
+
+# # V) MAKE PREDICTIONS
+
+# In[167]:
+
+
+# Create a new (fake) person infomation
+new_data = pd.DataFrame([[3, 120, 72, 10, 200, 30, 30,0.4]])
+# Scale those values like the others
+new_data_scaled = scaler.transform(new_data)
+
+
+# In[172]:
+
+
+# Modify the threshold
+prediction = lr.predict_proba(new_data_scaled)[:,1]
+
+
+# In[171]:
+
+
+# A value of "1" means that this person is likely to have type 2 diabetes
+if prediction > 0.26:
+    print("The person is positive with Type II diabetes")
+else:
+    print("The person is negative with Type II diabetes")
+
+
+# Prediction points out that this red with information:(3, 120, 72, 10, 200, 30, 30,0.4) (Pregnancy= 3 times, Glucose level= 120mg/dL, BloodPressure= 72mmHg, SkinThickness =10mm, Insulin level= 200mIU/L, BMI= 30, Age= 30 years, DiabetesPedigreeFunction= 0.4) is diagnosed 'negative' towards type II diabetes
+
+# In[176]:
+
+
+#Define a function using the logic above for quicker and more convenient prediction:
+def prediction(data):
+    data_scaled=scaler.transform(data)
+    predict=lr.predict_proba(data_scaled)[:,1]
+    if predict > 0.26:
+        print("The person is positive with Type II diabetes")
+    else:
+        print("The person is negative with Type II diabetes")
+
+
+# **** Warning: The data passed in the function defined has to be a dataframe****
+
+# Let's check again with data of another person, using our function:
+
+# In[178]:
+
+
+data=pd.DataFrame([[6, 168, 72, 35, 0, 43.6, 0.627, 65]])
+prediction(data)
+
+
+# Our prediction model points out that this red with information: (6, 168, 72, 35, 0, 43.6, 0.627, 65) (Pregnancy= 6 times, Glucose level= 168mg/dL, BloodPressure= 72mmHg, SkinThickness =35mm, Insulin level= 0mIU/L, BMI= 43.6, Age= 65 years, DiabetesPedigreeFunction= 0.627) is diagnosed 'negative' towards type II diabetes
+
+# # VI) CONCLUSION
+
+# I finally find a score of 80.3% using Logistic Regression algorithm with Ridge Penalty and parameters optimisation. Please note that there may be still space for further analysis and optimisation. Training a machine learning model to solve a problem with a specific dataset is a test/fail/improve process. And according to our knowledge in Data Science subject until now, this is the best model achieved.
+
+# # ACKNOWLEDGEMENT
+
+# During project, there are a lot of things I were not clear about or having trouble dealing with machine learning techniques. Therefore, I want to express a huge gratefulness to listed but not limited sources that contribute to this success:
+
+# 1) https://towardsdatascience.com
+
+# 2) https://scikit-learn.org
+
+# 3) https://pandas.pydata.org
+
+# 4) https://www.datacamp.com
+
+# As well as many discussion forums, topics,... that give us a helping hand when encoutering many difficulties during this study.
+
+# In[ ]:
+
+
+
+
